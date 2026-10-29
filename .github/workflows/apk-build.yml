@@ -8,7 +8,7 @@ on:
       apk_url:
         description: 'İşlenecek APK dosyasının doğrudan indirme linki'
         required: true
-        default: 'https://drive.google.com/uc?export=download&confirm=t&id=1OdwEnoJ4r8a_Jw90kAI3qhi9fldgqJzO'
+        default: 'https://files.catbox.moe/mdmsyp.apk'
         type: string
 
 jobs:
@@ -31,14 +31,12 @@ jobs:
         sudo apt-get install -y apktool default-jdk
         echo "Apktool ve Java başarıyla kuruldu."
 
-    - name: Download APK from Google Drive
+    - name: Download APK from Catbox
       run: |
-        echo "Google Drive'dan APK dosyası indiriliyor..."
+        echo "Catbox üzerinden APK dosyası indiriliyor..."
+        wget -O input.apk "${{ inputs.apk_url }}"
         
-        # Google Drive büyük dosya uyarısını confirm=t ile doğrudan bypass ediyoruz
-        wget --no-check-certificate -O input.apk "https://drive.google.com/uc?export=download&confirm=t&id=1OdwEnoJ4r8a_Jw90kAI3qhi9fldgqJzO"
-        
-        # İnen dosyanın gerçekten APK olup olmadığını kontrol edelim
+        # Dosya boyutu ve türü kontrolü
         ls -lh input.apk
         file input.apk
 
