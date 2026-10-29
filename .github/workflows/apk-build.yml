@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       apk_url:
-        description: 'İşlenecek APK dosyasının doğrudan indirme linki (örn: Google Drive / URL)'
+        description: 'İşlenecek APK dosyasının doğrudan indirme linki'
         required: true
-        default: 'https://drive.google.com/uc?export=download&id=1OdwEnoJ4r8a_Jw90kAI3qhi9fldgqJzO'
+        default: 'https://drive.google.com/uc?export=download&confirm=t&id=1OdwEnoJ4r8a_Jw90kAI3qhi9fldgqJzO'
         type: string
 
 jobs:
@@ -31,14 +31,18 @@ jobs:
         sudo apt-get install -y apktool default-jdk
         echo "Apktool ve Java başarıyla kuruldu."
 
-    - name: Download APK from URL
+    - name: Download APK from Google Drive
       run: |
-        echo "APK dosyası bağlantıdan indiriliyor..."
-        # Google Drive veya doğrudan bağlantılardan dosyayı çekiyoruz
-        curl -L "${{ inputs.apk_url }}" -o input.apk
+        echo "Google Drive'dan APK dosyası indiriliyor..."
         
-        # Dosyanın gerçekten inip inmediğini ve boyutunu kontrol edelim
+        # Google Drive büyük dosya onayını (confirm=t) bypass ederek indiriyoruz
+        curl -c ./cookie -s -L "https://drive.google.com/uc?export=download&id=1OdwEnoJ4r8a_Jw90kAI3qhi9fldgqJzO" > /dev/null
+        CONFIRM=$(awk '/_warning_/ {print $NF}' ./cookie)
+        curl -Lb ./cookie "https://drive.google.com/uc?export=download&confirm=${CONFIRM}&id=1OdwEnoJ4r8a_Jw90kAI3qhi9fldgqJzO" -o input.apk
+        
+        # İnen dosyanın boyutunu ve türünü kontrol edelim
         ls -lh input.apk
+        file input.apk
 
     - name: Decompile APK with Apktool
       run: |
@@ -48,7 +52,6 @@ jobs:
 
     - name: Apply Custom Patches / Modifications
       run: |
-        # BURAYA İSTEDİĞİNİZ ÖZEL YAMALARI / DEĞİŞİKLİKLERİ EKLEYEBİLİRSİNİZ
         echo "Özel yama adımları için bu alan kullanılabilir."
 
     - name: Rebuild APK with Apktool
