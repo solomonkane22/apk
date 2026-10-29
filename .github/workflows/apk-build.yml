@@ -34,7 +34,10 @@ jobs:
     - name: Download APK from Catbox
       run: |
         echo "Catbox üzerinden APK dosyası indiriliyor..."
-        wget -O input.apk "${{ inputs.apk_url }}"
+        # URL'yi temiz bir şekilde tırnak içinde çağırıyoruz
+        URL="${{ inputs.apk_url }}"
+        echo "İndirilen adres: $URL"
+        wget --no-check-certificate -O input.apk "$URL"
         
         # Dosya boyutu ve türü kontrolü
         ls -lh input.apk
