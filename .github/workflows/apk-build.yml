@@ -6,8 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       apk_url:
-        description: 'İşlenecek APK dosyasının doğrudan indirme linki (isteğe bağlı)'
-        required: false
+        description: 'İşlenecek APK dosyasının doğrudan indirme linki (örn: Google Drive / URL)'
+        required: true
+        default: 'https://drive.google.com/uc?export=download&id=1OdwEnoJ4r8a_Jw90kAI3qhi9fldgqJzO'
         type: string
 
 jobs:
@@ -30,19 +31,14 @@ jobs:
         sudo apt-get install -y apktool default-jdk
         echo "Apktool ve Java başarıyla kuruldu."
 
-    - name: Prepare APK (Download or Local)
+    - name: Download APK from URL
       run: |
-        # Eğer depoda 'input.apk' adında bir APK koyduysanız onu kullanır,
-        # yoksa workflow_dispatch üzerinden verilen URL'den indirir.
-        if [ -f "input.apk" ]; then
-          echo "Depodaki yerel input.apk kullanılıyor."
-        elif [ "${{ inputs.apk_url }}" != "" ]; then
-          echo "Verilen URL'den APK indiriliyor..."
-          curl -L "${{ inputs.apk_url }}" -o input.apk
-        else
-          echo "HATA: Ne yerel input.apk dosyası bulundu ne de bir URL girildi!"
-          exit 1
-        fi
+        echo "APK dosyası bağlantıdan indiriliyor..."
+        # Google Drive veya doğrudan bağlantılardan dosyayı çekiyoruz
+        curl -L "${{ inputs.apk_url }}" -o input.apk
+        
+        # Dosyanın gerçekten inip inmediğini ve boyutunu kontrol edelim
+        ls -lh input.apk
 
     - name: Decompile APK with Apktool
       run: |
@@ -53,12 +49,7 @@ jobs:
     - name: Apply Custom Patches / Modifications
       run: |
         # BURAYA İSTEDİĞİNİZ ÖZEL YAMALARI / DEĞİŞİKLİKLERİ EKLEYEBİLİRSİNİZ
-        # Örnek: Belirli bir smali dosyasını değiştirmek veya dosya eklemek
-        echo "Özel yama adımları buraya eklenebilir."
-        
-        # Örnek dosya düzenleme veya ekleme komutları:
-        # sed -i 's/eski_deger/yeni_deger/g' decompiled_source/smali/...
-
+        echo "Özel yama adımları için bu alan kullanılabilir."
 
     - name: Rebuild APK with Apktool
       run: |
@@ -68,8 +59,7 @@ jobs:
 
     - name: Sign APK (Align and Sign)
       run: |
-        # Test amaçlı kendi imzâmızı (debug keystore) oluşturup imzalıyoruz
-        # Özel bir keystore kullanmak isterseniz burayı güncelleyebiliriz.
+        # Test imzası oluşturuluyor
         keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -passin pass:android -passout pass:android -dname "CN=Android Debug,O=Android,C=US"
         
         # zipalign işlemi
@@ -77,7 +67,7 @@ jobs:
         
         # apksigner ile imzalama
         apksigner sign --ks debug.keystore --ks-pass pass:android --in aligned.apk final-rebuilt.apk
-        echo "APK imzalandı!"
+        echo "APK başarıyla imzalandı!"
 
     - name: Upload Rebuilt APK Artifact
       uses: actions/upload-artifact@v4
