@@ -1,0 +1,86 @@
+name: Decompile, Patch & Rebuild APK
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'İşlenecek APK dosyasının doğrudan indirme linki (isteğe bağlı)'
+        required: false
+        type: string
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Install Apktool & Build Tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y apktool default-jdk
+        echo "Apktool ve Java başarıyla kuruldu."
+
+    - name: Prepare APK (Download or Local)
+      run: |
+        # Eğer depoda 'input.apk' adında bir APK koyduysanız onu kullanır,
+        # yoksa workflow_dispatch üzerinden verilen URL'den indirir.
+        if [ -f "input.apk" ]; then
+          echo "Depodaki yerel input.apk kullanılıyor."
+        elif [ "${{ inputs.apk_url }}" != "" ]; then
+          echo "Verilen URL'den APK indiriliyor..."
+          curl -L "${{ inputs.apk_url }}" -o input.apk
+        else
+          echo "HATA: Ne yerel input.apk dosyası bulundu ne de bir URL girildi!"
+          exit 1
+        fi
+
+    - name: Decompile APK with Apktool
+      run: |
+        # APK'yı söküyoruz (decode)
+        apktool d input.apk -o decompiled_source -f
+        echo "APK kaynak kodlarına ve smali dosyalarına ayrıştırıldı."
+
+    - name: Apply Custom Patches / Modifications
+      run: |
+        # BURAYA İSTEDİĞİNİZ ÖZEL YAMALARI / DEĞİŞİKLİKLERİ EKLEYEBİLİRSİNİZ
+        # Örnek: Belirli bir smali dosyasını değiştirmek veya dosya eklemek
+        echo "Özel yama adımları buraya eklenebilir."
+        
+        # Örnek dosya düzenleme veya ekleme komutları:
+        # sed -i 's/eski_deger/yeni_deger/g' decompiled_source/smali/...
+
+
+    - name: Rebuild APK with Apktool
+      run: |
+        # Sökülen klasörü tekrar APK formatında paketliyoruz (rebuild)
+        apktool b decompiled_source -o unsigned.apk
+        echo "APK başarıyla yeniden derlendi/paketlendi."
+
+    - name: Sign APK (Align and Sign)
+      run: |
+        # Test amaçlı kendi imzâmızı (debug keystore) oluşturup imzalıyoruz
+        # Özel bir keystore kullanmak isterseniz burayı güncelleyebiliriz.
+        keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -passin pass:android -passout pass:android -dname "CN=Android Debug,O=Android,C=US"
+        
+        # zipalign işlemi
+        zipalign -p -f 4 unsigned.apk aligned.apk
+        
+        # apksigner ile imzalama
+        apksigner sign --ks debug.keystore --ks-pass pass:android --in aligned.apk final-rebuilt.apk
+        echo "APK imzalandı!"
+
+    - name: Upload Rebuilt APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Rebuilt-Modded-APK
+        path: final-rebuilt.apk
